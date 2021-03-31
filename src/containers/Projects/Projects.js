@@ -14,21 +14,26 @@ export default class Projects extends Component {
         description: '',
         date: '',
         targetAmount: 0,
+        donation: '',
         search: '',
         error:'',
-        mining:''
+        mining:'',
+        account: ''
     })
     async componentDidMount(){
+        const accounts = await window.ethereum.enable()
+        const account = accounts[0] // metamask address
         this.setState({
             ...this.state,
             spinner: true,
-            mining:''
+            mining:'',
+            account: account
         })
         this.getDataFromBlockchain()
     }
     async getDataFromBlockchain(){
         const web3 = new Web3(Web3.givenProvider)
-        let address = "0x7aFe4E8dC0dB7964076443b1257FD7AAa694f474" // address factory
+        let address = "0xd7a05B3cE38fe0BF366F20fE947b7854d9e149F6" // address factory
         let abi = [
             {
                 "inputs": [
@@ -100,62 +105,6 @@ export default class Projects extends Component {
                     "inputs": [
                         {
                             "internalType": "uint256",
-                            "name": "index",
-                            "type": "uint256"
-                        }
-                    ],
-                    "name": "approveWithdrawal",
-                    "outputs": [],
-                    "stateMutability": "nonpayable",
-                    "type": "function"
-                },
-                {
-                    "inputs": [],
-                    "name": "contribute",
-                    "outputs": [],
-                    "stateMutability": "payable",
-                    "type": "function"
-                },
-                {
-                    "inputs": [
-                        {
-                            "internalType": "string",
-                            "name": "description",
-                            "type": "string"
-                        },
-                        {
-                            "internalType": "uint256",
-                            "name": "value",
-                            "type": "uint256"
-                        },
-                        {
-                            "internalType": "address",
-                            "name": "recipient",
-                            "type": "address"
-                        }
-                    ],
-                    "name": "createWithdrawal",
-                    "outputs": [],
-                    "stateMutability": "nonpayable",
-                    "type": "function"
-                },
-                {
-                    "inputs": [
-                        {
-                            "internalType": "uint256",
-                            "name": "index",
-                            "type": "uint256"
-                        }
-                    ],
-                    "name": "finalizeWithdrawal",
-                    "outputs": [],
-                    "stateMutability": "nonpayable",
-                    "type": "function"
-                },
-                {
-                    "inputs": [
-                        {
-                            "internalType": "uint256",
                             "name": "_targetAmount",
                             "type": "uint256"
                         },
@@ -182,6 +131,39 @@ export default class Projects extends Component {
                     ],
                     "stateMutability": "nonpayable",
                     "type": "constructor"
+                },
+                {
+                    "inputs": [],
+                    "name": "balaceOf",
+                    "outputs": [
+                        {
+                            "internalType": "uint256",
+                            "name": "",
+                            "type": "uint256"
+                        }
+                    ],
+                    "stateMutability": "view",
+                    "type": "function"
+                },
+                {
+                    "inputs": [],
+                    "name": "completed",
+                    "outputs": [
+                        {
+                            "internalType": "bool",
+                            "name": "",
+                            "type": "bool"
+                        }
+                    ],
+                    "stateMutability": "view",
+                    "type": "function"
+                },
+                {
+                    "inputs": [],
+                    "name": "contribute",
+                    "outputs": [],
+                    "stateMutability": "payable",
+                    "type": "function"
                 },
                 {
                     "inputs": [],
@@ -217,6 +199,19 @@ export default class Projects extends Component {
                             "internalType": "string",
                             "name": "",
                             "type": "string"
+                        }
+                    ],
+                    "stateMutability": "view",
+                    "type": "function"
+                },
+                {
+                    "inputs": [],
+                    "name": "donatedAmount",
+                    "outputs": [
+                        {
+                            "internalType": "uint256",
+                            "name": "",
+                            "type": "uint256"
                         }
                     ],
                     "stateMutability": "view",
@@ -264,40 +259,14 @@ export default class Projects extends Component {
                 {
                     "inputs": [
                         {
-                            "internalType": "uint256",
-                            "name": "",
-                            "type": "uint256"
-                        }
-                    ],
-                    "name": "withdrawals",
-                    "outputs": [
-                        {
-                            "internalType": "string",
-                            "name": "description",
-                            "type": "string"
-                        },
-                        {
-                            "internalType": "uint256",
-                            "name": "value",
-                            "type": "uint256"
-                        },
-                        {
-                            "internalType": "address",
-                            "name": "recipient",
+                            "internalType": "address payable",
+                            "name": "_address",
                             "type": "address"
-                        },
-                        {
-                            "internalType": "bool",
-                            "name": "complete",
-                            "type": "bool"
-                        },
-                        {
-                            "internalType": "uint256",
-                            "name": "approvalCount",
-                            "type": "uint256"
                         }
                     ],
-                    "stateMutability": "view",
+                    "name": "withdrawAllFunds",
+                    "outputs": [],
+                    "stateMutability": "nonpayable",
                     "type": "function"
                 }
             ]
@@ -314,7 +283,10 @@ export default class Projects extends Component {
                         title: "",
                         description: "",
                         date: "",
-                        targetAmount: ""
+                        targetAmount: "",
+                        contract: "",
+                        donatedAmount: "",
+                        isOver: false
                     }
                     const executeContract = async (newAddress, newABI)=>{
                         let newContract = new web3.eth.Contract(newABI, newAddress)
@@ -330,10 +302,21 @@ export default class Projects extends Component {
                         await newContract.methods.targetAmount().call().then((response)=>{
                             obj.targetAmount = response
                         })
+                        await newContract.methods.donatedAmount().call().then((response)=>{
+                            obj.donatedAmount = response
+                        })
+                        await newContract.methods.balaceOf().call().then((response)=>{
+                            obj.donatedAmount = parseInt(obj.donatedAmount) + parseInt(response)
+                        })
+                        await newContract.methods.completed().call().then((response)=>{
+                            obj.isOver = response
+                        })
                         await newContract.methods.date().call().then((response)=>{
                             obj.date = response
+                            obj.contract = newContract
                             arr.push(obj)
                             this.setState({
+                                ...this.state,
                                 spinner: false,
                                 projects: [...arr],
                                 contract: contract
@@ -352,7 +335,7 @@ export default class Projects extends Component {
         })
     }
     createProjectHandler = async()=>{
-        if(this.state.title==='' || this.state.description==='' || this.state.targetAmount<0 || this.state.date==='' || !moment().isBefore(this.state.date)){
+        if(this.state.title==='' || this.state.description==='' || this.state.targetAmount<=0 || this.state.date==='' || !moment().isBefore(this.state.date)){
             this.setState({
                 ...this.state,
                 error: 'Invalid input'
@@ -376,11 +359,59 @@ export default class Projects extends Component {
             })
         }
     }
+    amountHandler = (e)=>{
+        this.setState({
+            ...this.state,
+            donation: e.target.value
+        })
+    }
+    donateHandler = async (contract)=>{
+        if (this.state.donation<=0) {
+            alert('Invalid donation amount')
+        }else{
+            // contribute
+            this.setState({
+                ...this.state,
+                spinner: true
+            })
+            const accounts = await window.ethereum.enable()
+            const account = accounts[0] // metamask address
+            await contract.methods.contribute().send({from: account, value: this.state.donation}).then((response)=>{
+                console.log(response)
+                this.getDataFromBlockchain()
+            }).catch((err)=>{
+                this.setState({
+                    ...this.state,
+                    spinner: false
+                })
+            })
+        }
+    }
+    withdrawFunds = async(contract)=>{
+        this.setState({
+            ...this.state,
+            spinner: true
+        })
+        const accounts = await window.ethereum.enable()
+        const account = accounts[0] // metamask address
+        await contract.methods.withdrawAllFunds(account).send({from: account}).then((response)=>{
+            this.getDataFromBlockchain()
+        }).catch((err)=>{
+            console.log(err)
+            this.setState({
+                ...this.state,
+                spinner: false
+            })
+        })
+    }
     render() {
+        let isShown
         let content = (
             this.state.projects.map((element, key)=>{
+                isShown = false
+                if(element.owner.toLowerCase()===this.state.account.toLowerCase()){isShown=true}
                 if(element.title.toLowerCase().includes(this.state.search.toLowerCase())){
-                    return <Project key={key} targetAmount={element.targetAmount} title={element.title} description={element.description} date={element.date}/>
+                    return <Project key={key} targetAmount={element.targetAmount} title={element.title} description={element.description} date={element.date} donatedAmount={element.donatedAmount} contract={element.contract} clickHandler={this.donateHandler} amountHandler={this.amountHandler} withdrawHandler={this.withdrawFunds} isShown={isShown} isOver={element.isOver}/>
                 }
             })
         )
