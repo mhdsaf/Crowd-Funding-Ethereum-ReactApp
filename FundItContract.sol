@@ -14,12 +14,14 @@ contract CrowdfundingCampaignFactory{
 contract CrowdfundingCampaign{
     string public title;
     string public description;
-    string public date;
-    address public owner;
-    uint public targetAmount;
-    uint public contributorsCount;
-    uint public donatedAmount;
-    bool public completed;
+    string public date; // expiry date of the campaign
+    address public owner; // address of the campaign owner
+    uint public targetAmount; // target amount of this campaign
+    uint public transactionCount; // how many transactions were made to this campaign
+    uint public donatedAmount; // total donated amount
+    bool public completed; // checks whether or not the project is done
+    bool public withdrawn;
+    mapping(address => uint) contributors; // maps contributor address to how much they donated
     constructor(uint _targetAmount, string memory _title, string memory _description, string memory _date, address creator) public {
         owner = creator;
         title = _title;
@@ -27,20 +29,45 @@ contract CrowdfundingCampaign{
         description = _description;
         targetAmount = _targetAmount;
         completed = false;
-    }
-    function contribute() public payable {
-        require(completed == false);
+        withdrawn = false;
     }
     modifier onlyOwner(){
         require(msg.sender == owner);
         _;
     }
-    function withdrawAllFunds(address payable _address) public onlyOwner{
+    modifier onlyContributor(){
+        require(contributors[msg.sender]>0);
+        _;
+    }
+    function contribute(uint _amount) public payable { // transfer money from contributor to the campaign
+        require(completed == false);
+        contributors[msg.sender]= _amount*1000000000000000000;
+        transactionCount++;
+        //check if we reached the targetAmount. if yes, we set completed to true
+        if(address(this).balance >= targetAmount){
+            completed = true;
+        }
+    }
+    function withdrawAllFunds(address payable _address) public onlyOwner{ // transfer all the funds to project owner
+        require(withdrawn == false);
         donatedAmount = address(this).balance;
         _address.transfer(address(this).balance);
-        completed = true;
+        withdrawn = true;
     }
-    function balaceOf() public view returns(uint){
+    function balaceOf() public view returns(uint){ // returns the total balance (amount donated) of this campaign
         return address(this).balance;
+    }
+    function contributorFund() public view onlyContributor returns(uint){ // returns how much a contributor donated to this campaign
+        return contributors[msg.sender];
+    }
+    function refund(address payable _address) public payable onlyContributor{ // transfer the funds to contributors if project fails
+        _address.transfer(contributorFund());
+    }
+    function isContributor(address _address) public view returns(bool){ // checks if a given address is a contributor
+        if(contributors[_address]>0){
+            return true;
+        }else{
+            return false;
+        }
     }
 }

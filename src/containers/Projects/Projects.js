@@ -33,7 +33,7 @@ export default class Projects extends Component {
     }
     async getDataFromBlockchain(){
         const web3 = new Web3(Web3.givenProvider)
-        let address = "0xd7a05B3cE38fe0BF366F20fE947b7854d9e149F6" // address factory
+        let address = "0x2c446f228F79efa8ADb1ee595dB24E5B3B0cD576" // address factory
         let abi = [
             {
                 "inputs": [
@@ -98,7 +98,6 @@ export default class Projects extends Component {
         ]
         let contract = new web3.eth.Contract(abi, address)
         await contract.methods.getDeployedCampaigns().call().then((response)=>{
-            console.log(response)
             let arr = []
             let newABI = [
                 {
@@ -159,7 +158,13 @@ export default class Projects extends Component {
                     "type": "function"
                 },
                 {
-                    "inputs": [],
+                    "inputs": [
+                        {
+                            "internalType": "uint256",
+                            "name": "_amount",
+                            "type": "uint256"
+                        }
+                    ],
                     "name": "contribute",
                     "outputs": [],
                     "stateMutability": "payable",
@@ -167,7 +172,7 @@ export default class Projects extends Component {
                 },
                 {
                     "inputs": [],
-                    "name": "contributorsCount",
+                    "name": "contributorFund",
                     "outputs": [
                         {
                             "internalType": "uint256",
@@ -218,6 +223,25 @@ export default class Projects extends Component {
                     "type": "function"
                 },
                 {
+                    "inputs": [
+                        {
+                            "internalType": "address",
+                            "name": "_address",
+                            "type": "address"
+                        }
+                    ],
+                    "name": "isContributor",
+                    "outputs": [
+                        {
+                            "internalType": "bool",
+                            "name": "",
+                            "type": "bool"
+                        }
+                    ],
+                    "stateMutability": "view",
+                    "type": "function"
+                },
+                {
                     "inputs": [],
                     "name": "owner",
                     "outputs": [
@@ -228,6 +252,19 @@ export default class Projects extends Component {
                         }
                     ],
                     "stateMutability": "view",
+                    "type": "function"
+                },
+                {
+                    "inputs": [
+                        {
+                            "internalType": "address payable",
+                            "name": "_address",
+                            "type": "address"
+                        }
+                    ],
+                    "name": "refund",
+                    "outputs": [],
+                    "stateMutability": "payable",
                     "type": "function"
                 },
                 {
@@ -257,6 +294,19 @@ export default class Projects extends Component {
                     "type": "function"
                 },
                 {
+                    "inputs": [],
+                    "name": "transactionCount",
+                    "outputs": [
+                        {
+                            "internalType": "uint256",
+                            "name": "",
+                            "type": "uint256"
+                        }
+                    ],
+                    "stateMutability": "view",
+                    "type": "function"
+                },
+                {
                     "inputs": [
                         {
                             "internalType": "address payable",
@@ -267,6 +317,19 @@ export default class Projects extends Component {
                     "name": "withdrawAllFunds",
                     "outputs": [],
                     "stateMutability": "nonpayable",
+                    "type": "function"
+                },
+                {
+                    "inputs": [],
+                    "name": "withdrawn",
+                    "outputs": [
+                        {
+                            "internalType": "bool",
+                            "name": "",
+                            "type": "bool"
+                        }
+                    ],
+                    "stateMutability": "view",
                     "type": "function"
                 }
             ]
@@ -286,7 +349,11 @@ export default class Projects extends Component {
                         targetAmount: "",
                         contract: "",
                         donatedAmount: "",
-                        isOver: false
+                        isOver: false,
+                        transactions: '',
+                        isContributor: '',
+                        contributorFund: '',
+                        withdrawn: ''
                     }
                     const executeContract = async (newAddress, newABI)=>{
                         let newContract = new web3.eth.Contract(newABI, newAddress)
@@ -300,16 +367,27 @@ export default class Projects extends Component {
                             obj.description = response
                         })
                         await newContract.methods.targetAmount().call().then((response)=>{
-                            obj.targetAmount = response
+                            obj.targetAmount = parseInt(response)/1000000000000000000
                         })
                         await newContract.methods.donatedAmount().call().then((response)=>{
                             obj.donatedAmount = response
                         })
                         await newContract.methods.balaceOf().call().then((response)=>{
-                            obj.donatedAmount = parseInt(obj.donatedAmount) + parseInt(response)
+                            obj.donatedAmount = (parseInt(obj.donatedAmount) + parseInt(response))/1000000000000000000
                         })
                         await newContract.methods.completed().call().then((response)=>{
                             obj.isOver = response
+                        })
+                        await newContract.methods.transactionCount().call().then((response)=>{
+                            obj.transactions = response
+                        })
+                        const accounts = await window.ethereum.enable()
+                        const account = accounts[0] // metamask address
+                        await newContract.methods.isContributor(account).call().then((response)=>{
+                            obj.isContributor = response
+                        })
+                        await newContract.methods.withdrawn().call().then((response)=>{
+                            obj.withdrawn = response
                         })
                         await newContract.methods.date().call().then((response)=>{
                             obj.date = response
@@ -376,7 +454,7 @@ export default class Projects extends Component {
             })
             const accounts = await window.ethereum.enable()
             const account = accounts[0] // metamask address
-            await contract.methods.contribute().send({from: account, value: this.state.donation}).then((response)=>{
+            await contract.methods.contribute(this.state.donation).send({from: account, value: (this.state.donation*1000000000000000000)}).then((response)=>{
                 console.log(response)
                 this.getDataFromBlockchain()
             }).catch((err)=>{
@@ -404,6 +482,23 @@ export default class Projects extends Component {
             })
         })
     }
+    refundHandler = async(contract)=>{
+        this.setState({
+            ...this.state,
+            spinner: true
+        })
+        const accounts = await window.ethereum.enable()
+        const account = accounts[0] // metamask address
+        await contract.methods.refund(account).send({from: account}).then((response)=>{
+            this.getDataFromBlockchain()
+        }).catch((err)=>{
+            console.log(err)
+            this.setState({
+                ...this.state,
+                spinner: false
+            })
+        })
+    }
     render() {
         let isShown
         let content = (
@@ -411,7 +506,7 @@ export default class Projects extends Component {
                 isShown = false
                 if(element.owner.toLowerCase()===this.state.account.toLowerCase()){isShown=true}
                 if(element.title.toLowerCase().includes(this.state.search.toLowerCase())){
-                    return <Project key={key} targetAmount={element.targetAmount} title={element.title} description={element.description} date={element.date} donatedAmount={element.donatedAmount} contract={element.contract} clickHandler={this.donateHandler} amountHandler={this.amountHandler} withdrawHandler={this.withdrawFunds} isShown={isShown} isOver={element.isOver}/>
+                    return <Project key={key} targetAmount={element.targetAmount} title={element.title} description={element.description} date={element.date} donatedAmount={element.donatedAmount} contract={element.contract} clickHandler={this.donateHandler} amountHandler={this.amountHandler} withdrawHandler={this.withdrawFunds} refundHandler={this.refundHandler} isShown={isShown} isOver={element.isOver} transactions={element.transactions} isContributor={element.isContributor} withdrawn={element.withdrawn}/>
                 }
             })
         )
